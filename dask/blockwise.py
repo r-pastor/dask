@@ -623,7 +623,9 @@ class Blockwise(Layer):
         return self._cached_dict["dsk"]
 
     def get_output_keys(self):
-        if self.output_blocks:
+        # breakpoint()
+        if not self.output_blocks is None:
+        # if self.output_blocks:
             # Culling has already generated a list of output blocks
             return {(self.output, *p) for p in self.output_blocks}
 
