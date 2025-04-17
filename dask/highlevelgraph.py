@@ -734,17 +734,11 @@ class HighLevelGraph(Graph):
                 layer.output_blocks = set(
                     k[1:] for k in necessary_get_keys if layer.task.key in k[0]
                 )
-            elif isinstance(layer, MaterializedLayer) or (
-                layer.is_materialized() and (len(layer) == len(culled_deps))
-            ):
-                necessary_get_keys.update(
-                    flatten(
-                        [
-                            list(layer[task_key].dependencies)
-                            for task_key in layer.keys()
-                        ]
-                    )
-                )
+            for task_key in layer.get_output_keys():
+                try:
+                    necessary_get_keys.update(set(layer[task_key].dependencies))
+                except Exception:
+                    continue
 
         all_ext_keys = self.get_all_external_keys()
 
@@ -793,8 +787,6 @@ class HighLevelGraph(Graph):
             layer_name: self.dependencies[layer_name] & ret_layers_keys
             for layer_name in ret_layers
         }
-
-        # breakpoint()
 
         return HighLevelGraph(ret_layers, ret_dependencies, ret_key_deps)
 
