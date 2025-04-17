@@ -725,9 +725,29 @@ class HighLevelGraph(Graph):
         from dask.layers import Blockwise
 
         keys_set = set(flatten(keys))
-        # RP: can I set the output_blocks here?
-        # This still computes the 10M chunks
+
+        # Assumption: a getitem type of task prunes the DAG
+        # Consequence/optimization: no need to generate tasks of pruned branches
+        necessary_get_keys = set()
+        for layer in self.layers.values():
+            if isinstance(layer, Blockwise) and necessary_get_keys:
+                layer.output_blocks = set(
+                    k[1:] for k in necessary_get_keys if layer.task.key in k[0]
+                )
+            elif isinstance(layer, MaterializedLayer) or (
+                layer.is_materialized() and (len(layer) == len(culled_deps))
+            ):
+                necessary_get_keys.update(
+                    flatten(
+                        [
+                            list(layer[task_key].dependencies)
+                            for task_key in layer.keys()
+                        ]
+                    )
+                )
+
         all_ext_keys = self.get_all_external_keys()
+
         ret_layers: dict = {}
         ret_key_deps: dict = {}
         for layer_name in reversed(self._toposort_layers()):
@@ -737,11 +757,7 @@ class HighLevelGraph(Graph):
             # a collections.abc.Set rather than a real set, and using &
             # would take time proportional to the size of the LHS, which
             # if there is no culling can be much bigger than the RHS.
-            # output_keys = keys_set.intersection(layer.get_output_keys())
-            if isinstance(layer, Blockwise):
-                output_keys = set(k for k in keys_set if layer_name in k[0])
-            else:
-                output_keys = keys_set.intersection(layer.get_output_keys())
+            output_keys = keys_set.intersection(layer.get_output_keys())
             if output_keys:
                 culled_layer, culled_deps = layer.cull(output_keys, all_ext_keys)
                 # Update `keys` with all layer's external key dependencies, which
@@ -777,6 +793,8 @@ class HighLevelGraph(Graph):
             layer_name: self.dependencies[layer_name] & ret_layers_keys
             for layer_name in ret_layers
         }
+
+        # breakpoint()
 
         return HighLevelGraph(ret_layers, ret_dependencies, ret_key_deps)
 

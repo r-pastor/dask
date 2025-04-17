@@ -1765,6 +1765,21 @@ def test_select():
     assert_eq(np.select(conditions, choices), da.select(d_conditions, d_choices))
 
 
+def test_select_massive_empty_da():
+    empty_da = da.full((1e8), fill_value=42, chunks=(10))
+    # This test takes around 10 seconds (or more) to run -> Assumption: it is too much.
+
+    # What is the cause of the slowness? 
+    # 1. creating the 10M keys/tasks?
+    # 2. looping through them at some point?
+    # 3. passing the info around?
+
+    # BONUS: why is a xarray dataset created out of empty_da slow to save with 
+    #        to_zarr(compute=False)? same issue as here?
+
+    assert_eq(empty_da[23].compute(), 42)
+
+
 def test_select_multidimension():
     x = np.random.default_rng().random((100, 50, 2))
     y = da.from_array(x, chunks=(50, 50, 1))
